@@ -57,7 +57,6 @@ def create_app(test_config=None):
     def update_book(book_id):
 
         body = request.get_json()
-
         try:
             book = Book.query.filter(Book.id == book_id).one_or_none()
             if book is None:
@@ -108,48 +107,60 @@ def create_app(test_config=None):
         new_title = body.get("title", None)
         new_author = body.get("author", None)
         new_rating = body.get("rating", None)
+        search = body.get('search', None)
 
         try:
-            book = Book(title=new_title, author=new_author, rating=new_rating)
-            book.insert()
+            if search is not None:
+                selection = Book.query.order_by(Book.id).\
+                filter(Book.title.ilike(f"%{search}%"))
+                current_books = paginate_books(request, selection)
+                return jsonify(
+                    {
+                        "success": True,
+                        "books": current_books,
+                        "total_books": len(selection.all()),
+                    }
+                )
 
-            selection = Book.query.order_by(Book.id).all()
-            current_books = paginate_books(request, selection)
+            else:
+                book = Book(title=new_title, author=new_author, rating=new_rating)
+                book.insert()
 
-            return jsonify(
-                {
-                    "success": True,
-                    "created": book.id,
-                    "books": current_books,
-                    "total_books": len(Book.query.all()),
-                }
-            )
+                selection = Book.query.order_by(Book.id).all()
+                current_books = paginate_books(request, selection)
+
+                return jsonify(
+                    {
+                        "success": True,
+                        "created": book.id,
+                        "books": current_books,
+                        "total_books": len(Book.query.all()),
+                    }
+                )
 
         except:
             abort(422)
 
-    # @TODO: Create a new endpoint or update a previous endpoint to handle searching for a team in the title
-    #        the body argument is called 'search' coming from the frontend.
-    #        If you use a different argument, make sure to update it in the frontend code.
-    #        The endpoint will need to return success value, a list of books for the search and the number of books with the search term
-    #        Response body keys: 'success', 'books' and 'total_books'
-
     @app.errorhandler(404)
     def not_found(error):
-        return (
-            jsonify({"success": False, "error": 404, "message": "resource not found"}),
+        return (jsonify({"success": False, 
+            "error": 404, 
+            "message": "resource not found"}),
             404,
         )
 
     @app.errorhandler(422)
     def unprocessable(error):
-        return (
-            jsonify({"success": False, "error": 422, "message": "unprocessable"}),
+        return (jsonify({"success": False, 
+            "error": 422, 
+            "message": "unprocessable"}),
             422,
         )
 
     @app.errorhandler(400)
     def bad_request(error):
-        return jsonify({"success": False, "error": 400, "message": "bad request"}), 400
+        return jsonify({"success": False, 
+            "error": 400, 
+            "message": "bad request"}), 400
 
     return app
